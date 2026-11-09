@@ -9,6 +9,17 @@ class SiteTest < ApplicationSystemTestCase
     assert_selector "h1", :text => "OpenStreetMap"
   end
 
+  test "header dialogs expose their roles and labels" do
+    visit "/"
+
+    assert_selector "#header-nav nav[aria-label='Main navigation']"
+    assert_selector "#select_language_dialog[role='dialog'][aria-labelledby='select_language_dialog_label']", :visible => :all
+    first("button[data-bs-target='#select_language_dialog']").click
+    assert_selector "#select_language_dialog.show[role='dialog'][aria-labelledby='select_language_dialog_label']"
+    assert_selector "#select_language_dialog_label", :text => "Select Language"
+    assert_selector "#osm_alert_modal[role='alertdialog'][aria-labelledby='osm_alert_title']", :visible => :all
+  end
+
   test "tooltip shows for Layers button" do
     visit "/"
 

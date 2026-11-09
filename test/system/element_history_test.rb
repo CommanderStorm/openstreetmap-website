@@ -14,6 +14,7 @@ class ElementHistoryTest < ApplicationSystemTestCase
     visit node_history_path(node)
 
     within_sidebar do
+      assert_selector "nav[aria-label='Node actions']"
       v2_heading = find :element, "h4", :text => "Version #2"
       v1_heading = find :element, "h4", :text => "Version #1", :below => v2_heading
 
@@ -38,6 +39,7 @@ class ElementHistoryTest < ApplicationSystemTestCase
     visit way_history_path(way)
 
     within_sidebar do
+      assert_selector "nav[aria-label='Way actions']"
       v2_heading = find :element, "h4", :text => "Version #2"
       v1_heading = find :element, "h4", :text => "Version #1", :below => v2_heading
 
@@ -60,6 +62,7 @@ class ElementHistoryTest < ApplicationSystemTestCase
     visit relation_history_path(relation)
 
     within_sidebar do
+      assert_selector "nav[aria-label='Relation actions']"
       v2_heading = find :element, "h4", :text => "Version #2"
       v1_heading = find :element, "h4", :text => "Version #1", :below => v2_heading
 

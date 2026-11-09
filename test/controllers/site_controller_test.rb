@@ -82,6 +82,14 @@ class SiteControllerTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_template "index"
+
+    policy = @response.headers["Content-Security-Policy"] || @response.headers["Content-Security-Policy-Report-Only"]
+    directives = policy.split(";").map(&:strip)
+    connect_sources = directives.find { |directive| directive.start_with?("connect-src ") }.split
+    image_sources = directives.find { |directive| directive.start_with?("img-src ") }.split
+    assert_includes connect_sources, Settings.wikimedia_commons_url
+    assert_includes image_sources, "upload.wikimedia.org"
+    assert_includes image_sources, "thumb.wikimedia.org"
   end
 
   # Test the index page redirects
@@ -500,11 +508,18 @@ class SiteControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_template "export"
     assert_template :layout => "map"
+    assert_select "html turbo-frame#sidebar_content_frame[target='_top']", :count => 1
+    assert_includes response.headers["Vary"].split(/,\s*/), "Accept-Language"
+    assert_includes response.headers["Vary"].split(/,\s*/), "Turbo-Frame"
 
     get export_path, :headers => { "Turbo-Frame" => "sidebar_content_frame" }
     assert_response :success
     assert_template "export"
     assert_template :layout => "xhr"
+    assert_select "turbo-frame#sidebar_content_frame[target='_top']", :count => 1
+    assert_select "#map", :count => 0
+    assert_includes response.headers["Vary"].split(/,\s*/), "Accept-Language"
+    assert_includes response.headers["Vary"].split(/,\s*/), "Turbo-Frame"
   end
 
   # Test that the export page lists a bulk download link for each source

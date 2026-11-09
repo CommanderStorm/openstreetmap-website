@@ -25,7 +25,7 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
     )
 
     options = {
-      :name => config_name
+      :name => opts.fetch(:driver_name, config_name)
     }
 
     if capybara_server_port

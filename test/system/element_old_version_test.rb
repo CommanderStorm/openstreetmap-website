@@ -9,6 +9,7 @@ class ElementOldVersionTest < ApplicationSystemTestCase
     visit old_node_path(node, 1)
 
     within_sidebar do
+      assert_selector "nav[aria-label='Node versions']"
       assert_css "h2", :text => "Node: #{node.id}"
       assert_css "h4", :text => "Version #1"
       assert_text(/Location: 60\.\d+, 30\.\d+/)
@@ -25,6 +26,7 @@ class ElementOldVersionTest < ApplicationSystemTestCase
     visit old_way_path(way, 1)
 
     within_sidebar do
+      assert_selector "nav[aria-label='Way versions']"
       assert_css "h2", :text => "Way: #{way.id}"
       assert_css "h4", :text => "Version #1"
 
@@ -40,6 +42,7 @@ class ElementOldVersionTest < ApplicationSystemTestCase
     visit old_relation_path(relation, 1)
 
     within_sidebar do
+      assert_selector "nav[aria-label='Relation versions']"
       assert_css "h2", :text => "Relation: #{relation.id}"
       assert_css "h4", :text => "Version #1"
 

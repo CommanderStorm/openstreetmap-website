@@ -3,6 +3,10 @@
 require "application_system_test_case"
 
 class ManageModerationZones < ApplicationSystemTestCase
+  driven_by_selenium "default",
+                     :driver_name => "default-reduced-motion",
+                     :preferences => { "ui.prefersReducedMotion" => 1 }
+
   test "Create a moderation zone and fail to put an anonymous note within it" do
     sign_in_as(create(:moderator_user))
 

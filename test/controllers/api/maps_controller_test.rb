@@ -237,6 +237,7 @@ module Api
       node3 = create(:node, :lat => 10, :lon => 10)
       way1 = create(:way_node, :node => node).way
       create(:way_node, :way => way1, :node => node2, :sequence_id => 2)
+      create(:way_node, :way => way1, :node => node, :sequence_id => 3)
       way2 = create(:way_node, :node => node).way
       create(:way_node, :way => way2, :node => node3, :sequence_id => 2)
       relation = create(:relation_member, :member => way1).relation
@@ -251,11 +252,26 @@ module Api
         assert_select "node[id='#{node2.id}']", :count => 1
         assert_select "node[id='#{node3.id}']", :count => 1
         assert_select "way", :count => 2
-        assert_select "way[id='#{way1.id}']", :count => 1
+        assert_select "way[id='#{way1.id}']", :count => 1 do |ways|
+          refs = ways.first.css("nd").map { |nd| nd["ref"].to_i }
+          assert_equal [node.id, node2.id, node.id], refs
+          assert_equal way1.changeset.user.display_name, ways.first["user"]
+          assert_equal way1.changeset.user_id, ways.first["uid"].to_i
+        end
         assert_select "way[id='#{way2.id}']", :count => 1
         assert_select "relation", :count => 1
         assert_select "relation[id='#{relation.id}']", :count => 1
       end
+
+      get api_map_path(:bbox => bbox, :format => "json")
+      assert_response :success
+      elements = ActiveSupport::JSON.decode(@response.body)["elements"]
+      assert_equal [node.id, node2.id, node3.id].sort, elements.filter { |element| element["type"] == "node" }.pluck("id").sort
+      json_way = elements.find { |element| element["type"] == "way" && element["id"] == way1.id }
+      assert_not_nil json_way
+      assert_equal [node.id, node2.id, node.id], json_way["nodes"]
+      assert_equal way1.changeset.user.display_name, json_way["user"]
+      assert_equal way1.changeset.user_id, json_way["uid"]
     end
 
     def test_map_empty
