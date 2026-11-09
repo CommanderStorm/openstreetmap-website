@@ -3,6 +3,49 @@
 require "application_system_test_case"
 
 class DirectionsSystemTest < ApplicationSystemTestCase
+  test "routing icons overlay inputs and can be dragged onto the map" do
+    visit directions_path(:anchor => "map=15/1/1")
+    assert_selector "#directions_route", :visible => :all
+    stub_disable_reverse_geocoding
+    icon = find("#sidebar .routing_marker_column span[data-type='from']")
+    assert page.evaluate_script(<<~JS, icon)
+      (icon => {
+        const input = icon.closest(".d-grid").querySelector("input");
+        const a = icon.getBoundingClientRect();
+        const b = input.getBoundingClientRect();
+        const target = document.elementFromPoint(a.left + a.width / 2, a.top + a.height / 2);
+        return a.left >= b.left && a.right <= b.right && a.top < b.bottom && a.bottom > b.top &&
+          (target === icon || icon.contains(target));
+      })(arguments[0])
+    JS
+    icon.drag_to(find_by_id("map"))
+    assert_selector "#sidebar input[name='route_from'][data-lat][data-lon]"
+    assert_match(/,/, find("#sidebar input[name='route_from']").value)
+    assert_selector "#map .leaflet-marker-icon use[href='#pin-start']", :visible => :all
+  end
+
+  test "mobile directions stay open until a route is requested" do
+    original_size = page.current_window.size
+    page.current_window.resize_to(600, 800)
+    visit root_path(:anchor => "map=15/1/1")
+    find(".navbar-toggler").click
+    within("#header-nav") { find(".switch_link").click }
+    assert_current_path directions_path
+    assert_selector ".navbar-toggler[aria-expanded='true']:not(.collapsed)"
+    assert_selector "#directions_route", :visible => :all
+    stub_straight_routing
+    stub_disable_reverse_geocoding
+    within("#header-nav") do
+      find_field("route_from").set("1, 1").send_keys :enter
+      find_field("route_to").set("1.01, 1.01").send_keys :enter
+    end
+    assert_selector ".navbar-toggler.collapsed[aria-expanded='false']"
+    assert_no_selector "#header-nav", :visible => :visible
+    within_sidebar { assert_content "Start here" }
+  ensure
+    page.current_window.resize_to(*original_size) if original_size
+  end
+
   test "updates route output on mode change" do
     visit directions_path
 
