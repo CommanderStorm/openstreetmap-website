@@ -3,6 +3,8 @@
 require "application_system_test_case"
 
 class ManageModerationZones < ApplicationSystemTestCase
+  driven_by_selenium "default", :preferences => { "ui.prefersReducedMotion" => 1 }
+
   test "Create a moderation zone and fail to put an anonymous note within it" do
     sign_in_as(create(:moderator_user))
 
@@ -30,6 +32,8 @@ class ManageModerationZones < ApplicationSystemTestCase
       click_on "Add Note"
 
       assert_content "There was an error when creating the note"
+      find(".new-note-error summary").click
+      assert_text "You don't have permissions to make changes here. Please either sign in or create an OpenStreetMap account"
     end
   end
 
@@ -49,5 +53,32 @@ class ManageModerationZones < ApplicationSystemTestCase
 
     zone.reload
     assert_equal user, zone.revoker
+  end
+
+  test "edit a fitted moderation zone polygon" do
+    moderator = create(:moderator_user)
+    zone = create(:moderation_zone, :seville_cathedral, :creator => moderator)
+    original = zone.zone.exterior_ring.points.map { |point| [point.x, point.y] }
+    sign_in_as(moderator)
+    visit edit_moderation_zone_path(zone)
+
+    map = find_by_id("map")
+    field = find_by_id("moderation_zone_zone", :visible => :all)
+    initial_value = field.value
+    Selenium::WebDriver::Wait.new(:timeout => 15, :interval => 0.1).until do
+      map.click(:offset => :center)
+      # The fixture's first vertex is at this offset once the map fits the polygon.
+      page.driver.browser.action.move_to(map.native, -65, -62).click_and_hold.move_by(-20, -10).release.perform
+      field.value != initial_value
+    end
+
+    click_on "Update Moderation zone"
+    assert_text "Moderation zone updated"
+    updated = zone.reload.zone.exterior_ring.points.map { |point| [point.x, point.y] }
+    assert_not_equal original.first, updated.first
+    assert_equal original[1...-1], updated[1...-1]
+    assert_equal updated.first, updated.last
+    assert_in_delta original.first[0], updated.first[0], 0.001
+    assert_in_delta original.first[1], updated.first[1], 0.001
   end
 end
