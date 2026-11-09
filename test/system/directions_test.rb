@@ -3,9 +3,54 @@
 require "application_system_test_case"
 
 class DirectionsSystemTest < ApplicationSystemTestCase
+  test "OSRM U-turn icons follow the driving side" do
+    visit directions_path(:anchor => "map=15/1/1")
+    assert_selector "#directions_route", :visible => :all
+    stub_disable_reverse_geocoding
+    page.execute_script(<<~JS)
+      const originalFetch = window.fetch;
+      window.fetch = function (input, options) {
+        const url = typeof input === "string" ? input : input.url;
+        if (!url.startsWith(OSM.FOSSGIS_OSRM_URL)) return originalFetch.call(this, input, options);
+        const step = (driving_side, name) => ({
+          driving_side, name, mode: "driving", intersections: [],
+          maneuver: { type: "turn", modifier: "uturn" },
+          distance: 10, geometry: "_ibE_ibEo}@o}@"
+        });
+        const response = {
+          code: "Ok",
+          waypoints: [{ hint: "start" }, { hint: "end" }],
+          routes: [{ legs: [{
+            distance: 20, duration: 10,
+            steps: [step("right", "Right Road"), step("left", "Left Road")]
+          }] }]
+        };
+        return Promise.resolve(new Response(JSON.stringify(response), { status: 200 }));
+      };
+    JS
+    select "OSRM", :from => "routing_engines"
+    find_by_id("route_from").set("1, 1").send_keys :enter
+    find_by_id("route_to").set("1.01, 1.01").send_keys :enter
+
+    within "#directions_route_steps" do
+      assert_selector "tr:nth-child(1) use[href='#routing-sprite-u-turn-left']", :visible => :all
+      assert_selector "tr:nth-child(2) use[href='#routing-sprite-u-turn-right']", :visible => :all
+      assert_text "U-turn along Right Road"
+      assert_text "U-turn along Left Road"
+    end
+    assert_selector "symbol#routing-sprite-u-turn-left", :visible => :all
+    assert_selector "symbol#routing-sprite-u-turn-right", :visible => :all
+    assert page.evaluate_script("Boolean(window.__map__.getSource('directions-route'))")
+  end
+
   test "routing icons overlay inputs and can be dragged onto the map" do
     visit directions_path(:anchor => "map=15/1/1")
     assert_selector "#directions_route", :visible => :all
+    within "#sidebar" do
+      assert_selector ".routing_marker_column [data-type='from'] svg title", :text => "Route start marker", :visible => :all
+      assert_selector ".routing_marker_column [data-type='to'] svg title", :text => "Route end marker", :visible => :all
+    end
+    assert_selector "svg.d-none[aria-hidden='true']", :visible => :all
     stub_disable_reverse_geocoding
     icon = find("#sidebar .routing_marker_column span[data-type='from']")
     assert page.evaluate_script(<<~JS, icon)
@@ -21,7 +66,7 @@ class DirectionsSystemTest < ApplicationSystemTestCase
     icon.drag_to(find_by_id("map"))
     assert_selector "#sidebar input[name='route_from'][data-lat][data-lon]"
     assert_match(/,/, find("#sidebar input[name='route_from']").value)
-    assert_selector "#map .leaflet-marker-icon use[href='#pin-start']", :visible => :all
+    assert_selector "#map .maplibre-gl-marker use[href='#pin-start']", :visible => :all
   end
 
   test "mobile directions stay open until a route is requested" do
@@ -36,8 +81,8 @@ class DirectionsSystemTest < ApplicationSystemTestCase
     stub_straight_routing
     stub_disable_reverse_geocoding
     within("#header-nav") do
-      find_field("route_from").set("1, 1").send_keys :enter
-      find_field("route_to").set("1.01, 1.01").send_keys :enter
+      find_field(:name => "route_from").set("1, 1").send_keys :enter
+      find_field(:name => "route_to").set("1.01, 1.01").send_keys :enter
     end
     assert_selector ".navbar-toggler.collapsed[aria-expanded='false']"
     assert_no_selector "#header-nav", :visible => :visible
@@ -110,11 +155,23 @@ class DirectionsSystemTest < ApplicationSystemTestCase
     end
   end
 
+  test "shows a routing error while directions are active" do
+    visit directions_path
+    assert_selector "#directions_route", :visible => :all
+    stub_disable_reverse_geocoding
+    stub_routing 'return Promise.reject(new Error("Routing unavailable"));'
+
+    find_by_id("route_from").set("1, 1").send_keys :enter
+    find_by_id("route_to").set("1.01, 1.01").send_keys :enter
+
+    assert_selector "#directions_error .alert.alert-danger"
+  end
+
   private
 
   def stub_straight_routing(start_instruction: "Start here", finish_instruction: "Finish there")
     stub_routing <<~CALLBACK
-      const distance = points[0].distanceTo(points[1]);
+      const distance = maplibregl.LngLat.convert(points[0]).distanceTo(maplibregl.LngLat.convert(points[1]));
       const time = distance * 30;
       return Promise.resolve({
         line: points,
