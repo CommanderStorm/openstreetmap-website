@@ -6,7 +6,7 @@
       :uri => diary_entry_path(
         record.diary_entry.user,
         record.diary_entry,
-        :anchor => "c#{record.id}"
+        :anchor => "comment#{record.id}"
       ),
       :timestamp => record.created_at
     ) %>
